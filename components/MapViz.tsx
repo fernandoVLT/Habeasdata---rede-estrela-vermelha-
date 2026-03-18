@@ -39,21 +39,22 @@ const SafeOverlayChild = ({ children, latLngToPixel, pixelToLatLng, setCenterZoo
   return <div {...rest}>{children}</div>;
 };
 
-// Memoized Marker Component to prevent unnecessary re-renders
-const MapMarker = React.memo(({ point, isActive, onClick, latLngToPixel, pixelToLatLng, setCenterZoom, mapProps, mapState, left, top, ...rest }: any) => {
-  // We explicitly extract pigeon-maps internal props and only spread the rest (like style) to the div
+// Marker Component
+const MapMarker = ({ point, isActive, onClick }: any) => {
   return (
     <div 
-      {...rest}
       className={`relative group cursor-pointer transform transition-transform duration-300 ${isActive ? 'z-50 scale-125' : 'z-10 hover:scale-110 hover:z-40'}`}
-      onClick={() => onClick(point)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(point);
+      }}
     >
       {/* Live Pulsing Effect - Optimized */}
       {point.isLive && (
         <>
-          <div className="absolute top-0 left-0 w-10 h-10 bg-red-500 rounded-full animate-ping opacity-75"></div>
-          <div className="absolute -inset-2 bg-red-500 rounded-full blur-md opacity-40 animate-pulse"></div>
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm whitespace-nowrap animate-bounce">
+          <div className="absolute -inset-2 bg-red-500 rounded-full animate-ping opacity-75 pointer-events-none"></div>
+          <div className="absolute -inset-4 bg-red-500 rounded-full blur-md opacity-40 animate-pulse pointer-events-none"></div>
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm whitespace-nowrap animate-bounce z-20 pointer-events-none">
              AO VIVO
           </div>
         </>
@@ -64,7 +65,7 @@ const MapMarker = React.memo(({ point, isActive, onClick, latLngToPixel, pixelTo
          {getIcon(point.category, point.isLive)}
       </div>
       {/* Triangle at bottom */}
-      <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent ${getColor(point.category, point.isLive).replace('bg-', 'border-t-').split(' ')[0]}`}></div>
+      <div className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent ${getColor(point.category, point.isLive).replace('bg-', 'border-t-').split(' ')[0]} pointer-events-none`}></div>
       
       {/* Tooltip on Hover */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
@@ -72,7 +73,7 @@ const MapMarker = React.memo(({ point, isActive, onClick, latLngToPixel, pixelTo
       </div>
     </div>
   );
-});
+};
 
 export const MapViz: React.FC<MapVizProps> = ({ focusLocation }) => {
   const [selectedCategory, setSelectedCategory] = useState<MapCategory | 'ALL'>('ALL');
@@ -156,11 +157,13 @@ export const MapViz: React.FC<MapVizProps> = ({ focusLocation }) => {
 
           {filteredPoints.map((point) => (
             <Overlay key={point.id} anchor={[point.lat, point.lng]} offset={[15, 30]}>
-              <MapMarker 
-                point={point} 
-                isActive={activePoint?.id === point.id} 
-                onClick={setActivePoint} 
-              />
+              <SafeOverlayChild>
+                <MapMarker 
+                  point={point} 
+                  isActive={activePoint?.id === point.id} 
+                  onClick={setActivePoint} 
+                />
+              </SafeOverlayChild>
             </Overlay>
           ))}
           

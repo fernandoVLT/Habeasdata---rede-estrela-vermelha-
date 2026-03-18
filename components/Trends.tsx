@@ -5,12 +5,24 @@ import { TRENDS, WHO_TO_FOLLOW, LEADERS_LIST } from '../constants';
 export const Trends: React.FC = () => {
   // Estado para controlar quem o usuário está seguindo (apenas visual/mock)
   const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleFollowToggle = (userId: string) => {
-    setFollowingState(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleFollowToggle = (user: any) => {
+    setFollowingState(prev => {
+      const isNowFollowing = !prev[user.id];
+      if (isNowFollowing) {
+        showToast(`Você começou a seguir ${user.name}`);
+      }
+      return {
+        ...prev,
+        [user.id]: isNowFollowing
+      };
+    });
   };
 
   return (
@@ -63,7 +75,7 @@ export const Trends: React.FC = () => {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleFollowToggle(user.id);
+                      handleFollowToggle(user);
                     }}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${
                       isFollowing 
@@ -120,7 +132,7 @@ export const Trends: React.FC = () => {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleFollowToggle(user.id);
+                      handleFollowToggle(user);
                     }}
                     className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200 border ${
                       isFollowing 
@@ -154,6 +166,13 @@ export const Trends: React.FC = () => {
           <span>© 2024 Rede Estrela</span>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-10 right-10 bg-gray-900 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium z-50 animate-in slide-in-from-bottom-5">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 };

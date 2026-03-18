@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
-import { Home, Map as MapIcon, User as UserIcon, Bell, SquarePen, Star, ArrowLeft, Calendar, MoreHorizontal, Megaphone } from 'lucide-react';
+import { Home, Map as MapIcon, User as UserIcon, Bell, SquarePen, Star, MoreHorizontal, Megaphone, BarChart2, Search } from 'lucide-react';
 import { Feed } from './components/Feed';
 import { MapViz } from './components/MapViz';
 import { Trends } from './components/Trends';
 import { ActionsHub } from './components/ActionsHub';
+import { LandingPage } from './components/LandingPage';
+import { ProfileDashboard } from './components/ProfileDashboard';
+import { EstrelinhaAI } from './components/EstrelinhaAI';
+import { Dashboard } from './components/Dashboard';
 import { CURRENT_USER, NOTIFICATIONS } from './constants';
 
 enum View {
   HOME = 'HOME',
   MAP = 'MAP',
-  ACTIONS = 'ACTIONS', // Nova view
+  ACTIONS = 'ACTIONS',
   PROFILE = 'PROFILE',
-  NOTIFICATIONS = 'NOTIFICATIONS'
+  NOTIFICATIONS = 'NOTIFICATIONS',
+  DASHBOARD = 'DASHBOARD'
 }
 
 // Mobile Bottom Navigation Item
@@ -53,6 +58,8 @@ const SidebarItem = ({ view, icon: Icon, label, currentView, setCurrentView, has
 );
 
 const App: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.HOME);
   
   // New state to control map focus from ActionsHub
@@ -61,10 +68,31 @@ const App: React.FC = () => {
   // Fake notification state
   const hasNewActions = true; 
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleNavigateToMap = (lat: number, lng: number) => {
     setMapTarget({ lat, lng, zoom: 16 });
     setCurrentView(View.MAP);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-red-600 text-white">
+        <Star size={80} className="animate-spin fill-current mb-6" />
+        <h1 className="text-3xl font-bold tracking-tight">Rede Estrela</h1>
+        <p className="text-red-200 mt-2 font-medium">Conectando a militância...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LandingPage onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="flex justify-center min-h-screen bg-white">
@@ -82,6 +110,7 @@ const App: React.FC = () => {
               <SidebarItem view={View.HOME} icon={Home} label="Página Inicial" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.ACTIONS} icon={Megaphone} label="Ações" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.MAP} icon={MapIcon} label="Mapa Militância" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+              <SidebarItem view={View.DASHBOARD} icon={BarChart2} label="Métricas" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.NOTIFICATIONS} icon={Bell} label="Notificações" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
             </nav>
@@ -108,11 +137,25 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 w-full max-w-[600px] min-h-screen border-r border-gray-200 relative pb-16 sm:pb-0">
+          {/* Global Search Bar */}
+          <div className="sticky top-0 bg-white/85 backdrop-blur-md z-20 border-b border-gray-200 px-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Buscar na Rede Estrela..." 
+                className="w-full bg-gray-100 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-red-600"
+              />
+            </div>
+          </div>
+
           {currentView === View.HOME && <Feed />}
           
           {currentView === View.ACTIONS && <ActionsHub onNavigateToMap={handleNavigateToMap} />}
 
           {currentView === View.MAP && <MapViz focusLocation={mapTarget} />}
+
+          {currentView === View.DASHBOARD && <Dashboard />}
           
           {currentView === View.NOTIFICATIONS && (
             <div className="flex flex-col h-full">
@@ -168,81 +211,7 @@ const App: React.FC = () => {
           )}
 
           {currentView === View.PROFILE && (
-            <div className="flex flex-col min-h-screen">
-               {/* Header Navigation */}
-               <div className="sticky top-0 bg-white/85 backdrop-blur-md z-10 px-4 py-1 flex items-center gap-6 border-b border-gray-100">
-                  <button onClick={() => setCurrentView(View.HOME)} className="p-2 rounded-full hover:bg-gray-100">
-                    <ArrowLeft size={20} />
-                  </button>
-                  <div>
-                    <h2 className="text-lg font-bold leading-none">{CURRENT_USER.name}</h2>
-                    <span className="text-xs text-gray-500">1.254 posts</span>
-                  </div>
-               </div>
-
-               {/* Banner */}
-               <div className="h-48 bg-gray-200 w-full overflow-hidden">
-                 {CURRENT_USER.banner && <img src={CURRENT_USER.banner} className="w-full h-full object-cover" />}
-               </div>
-               
-               {/* Profile Info */}
-               <div className="px-4 pb-4">
-                  <div className="flex justify-between items-start">
-                    <div className="relative -mt-20 mb-3">
-                      <img src={CURRENT_USER.avatar} className="w-36 h-36 rounded-full border-4 border-white object-cover" />
-                    </div>
-                    <button className="mt-3 px-4 py-1.5 border border-gray-300 rounded-full font-bold text-sm hover:bg-gray-100 transition-colors">
-                      Editar perfil
-                    </button>
-                  </div>
-                  
-                  <div className="mt-1">
-                    <div className="flex items-center gap-1">
-                       <h1 className="text-xl font-extrabold text-gray-900">{CURRENT_USER.name}</h1>
-                       {CURRENT_USER.isVerified && (
-                          <svg viewBox="0 0 24 24" aria-label="Conta verificada" className="w-5 h-5 text-red-600 fill-current"><g><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"></path></g></svg>
-                       )}
-                    </div>
-                    <p className="text-gray-500 text-sm">{CURRENT_USER.handle}</p>
-                  </div>
-
-                  <p className="mt-3 text-gray-900 text-[15px]">{CURRENT_USER.bio}</p>
-                  
-                  <div className="flex gap-4 mt-3 text-gray-500 text-sm">
-                     <div className="flex items-center gap-1">
-                        <MapIcon size={16} />
-                        <span>Betim, Brasil</span>
-                     </div>
-                     <div className="flex items-center gap-1">
-                        <Calendar size={16} />
-                        <span>Ingressou em {CURRENT_USER.joinedDate}</span>
-                     </div>
-                  </div>
-
-                  <div className="flex gap-4 mt-3 text-sm">
-                    <span className="text-gray-500"><strong className="text-gray-900">{CURRENT_USER.following}</strong> Seguindo</span>
-                    <span className="text-gray-500"><strong className="text-gray-900">{CURRENT_USER.followers}</strong> Seguidores</span>
-                  </div>
-               </div>
-
-               {/* Tabs */}
-               <div className="flex border-b border-gray-200 mt-2">
-                 {['Posts', 'Respostas', 'Destaques', 'Mídia', 'Curtidas'].map((tab, idx) => (
-                   <button key={tab} className="flex-1 py-3 hover:bg-gray-100 relative text-center transition-colors">
-                      <span className={`font-medium text-sm ${idx === 0 ? 'text-gray-900' : 'text-gray-500'}`}>{tab}</span>
-                      {idx === 0 && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-1 bg-red-600 rounded-full"></div>}
-                   </button>
-                 ))}
-               </div>
-
-               {/* Mock Content for Profile Feed */}
-               <div className="flex-1 bg-white">
-                  {/* Reuse Feed Items logic or simplified version */}
-                  <div className="p-8 text-center text-gray-500 text-sm">
-                     Aqui aparecerão seus posts.
-                  </div>
-               </div>
-            </div>
+            <ProfileDashboard onBack={() => setCurrentView(View.HOME)} />
           )}
         </main>
 
@@ -260,6 +229,8 @@ const App: React.FC = () => {
         <MobileNavItem view={View.NOTIFICATIONS} icon={Bell} label="Avisos" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
         <MobileNavItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
       </div>
+
+      <EstrelinhaAI />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Megaphone, FileText, GraduationCap, HandHeart, Calendar, MapPin, Users, CheckCircle2, TrendingUp, Plus, Vote, X, Maximize2, Clock, ShieldCheck, AlertTriangle, Phone, Scale, ChevronLeft, ChevronRight, Link as LinkIcon, Download } from 'lucide-react';
+import { Megaphone, FileText, GraduationCap, HandHeart, Calendar, MapPin, Users, CheckCircle2, TrendingUp, Plus, Vote, X, Maximize2, Clock, ShieldCheck, AlertTriangle, Phone, Scale, ChevronLeft, ChevronRight, Link as LinkIcon, Download, Bookmark } from 'lucide-react';
 import { ACTIONS_DATA, PETITIONS_DATA, UNIVERSITY_DATA, SOCIAL_AID_DATA, POLLS_DATA, FACT_CHECK_DATA } from '../constants';
 
 interface ActionsHubProps {
@@ -20,9 +20,34 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
   // State for Event Filter
   const [eventFilter, setEventFilter] = useState<'ALL' | 'PROTEST' | 'MEETING'>('ALL');
   const [regionFilter, setRegionFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | '15_DAYS'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'LIVE' | 'FUTURE' | 'PAST'>('ALL');
+
+  // Pagination state
+  const [viewMode, setViewMode] = useState<'PAGINATED' | 'ALL'>('PAGINATED');
+  const [currentEventIndex, setCurrentEventIndex] = useState(0);
 
   // State for Attendance (Simulated local storage)
   const [attendanceState, setAttendanceState] = useState<Record<string, boolean>>({});
+  const [savedActions, setSavedActions] = useState<Record<string, boolean>>({});
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const toggleSaveAction = (id: string) => {
+    setSavedActions(prev => {
+      const isSaved = !prev[id];
+      if (isSaved) {
+        showToast('Salvo em seus favoritos!');
+      } else {
+        showToast('Removido dos favoritos.');
+      }
+      return { ...prev, [id]: isSaved };
+    });
+  };
 
   // State for Carousels
   const [carouselIndices, setCarouselIndices] = useState<Record<string, number>>({});
@@ -31,7 +56,28 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
   const [newEventImages, setNewEventImages] = useState<string[]>([]);
   const [currentImageInput, setCurrentImageInput] = useState('');
 
-  // State for Petition Creation
+  // State for Events
+  const [events, setEvents] = useState(ACTIONS_DATA);
+  const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventTime, setNewEventTime] = useState('');
+  const [newEventLocation, setNewEventLocation] = useState('');
+  const [newEventDescription, setNewEventDescription] = useState('');
+  const [newEventType, setNewEventType] = useState<'PROTEST' | 'MEETING'>('PROTEST');
+
+  // State for Polls
+  const [polls, setPolls] = useState(POLLS_DATA);
+  const [votedPolls, setVotedPolls] = useState<Record<string, string>>({}); // pollId -> optionId
+  const [newPollQuestion, setNewPollQuestion] = useState('');
+  const [newPollOptions, setNewPollOptions] = useState(['', '', '']);
+  const [newPollDuration, setNewPollDuration] = useState('24 horas');
+
+  // State for Petitions
+  const [petitions, setPetitions] = useState(PETITIONS_DATA);
+  const [signedPetitions, setSignedPetitions] = useState<Record<string, boolean>>({});
+  const [newPetitionTitle, setNewPetitionTitle] = useState('');
+  const [newPetitionDescription, setNewPetitionDescription] = useState('');
+  const [newPetitionGoal, setNewPetitionGoal] = useState('');
   const [newPetitionAttachments, setNewPetitionAttachments] = useState<{type: 'PDF' | 'LINK', title: string, url: string}[]>([]);
   const [currentAttachmentInput, setCurrentAttachmentInput] = useState('');
   const [currentAttachmentType, setCurrentAttachmentType] = useState<'PDF' | 'LINK'>('LINK');
@@ -54,36 +100,201 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
     }
   };
 
+  const handleVote = (pollId: string, optionId: string) => {
+    if (votedPolls[pollId]) return; // Already voted
+
+    setVotedPolls(prev => ({ ...prev, [pollId]: optionId }));
+    
+    setPolls(prevPolls => prevPolls.map(poll => {
+      if (poll.id === pollId) {
+        const newTotalVotes = poll.totalVotes + 1;
+        const newOptions = poll.options.map(opt => {
+          if (opt.id === optionId) {
+            return { ...opt, votes: opt.votes + 1 };
+          }
+          return opt;
+        });
+        
+        // Recalculate percentages
+        const updatedOptions = newOptions.map(opt => ({
+          ...opt,
+          percent: Math.round((opt.votes / newTotalVotes) * 100)
+        }));
+
+        return { ...poll, totalVotes: newTotalVotes, options: updatedOptions };
+      }
+      return poll;
+    }));
+  };
+
+  const handleCreateEvent = () => {
+    if (!newEventTitle.trim() || !newEventDate || !newEventLocation.trim()) {
+      showToast('Preencha título, data e local.');
+      return;
+    }
+
+    const newEvent = {
+      id: `evt-${Date.now()}`,
+      type: newEventType,
+      title: newEventTitle,
+      date: `${newEventDate} às ${newEventTime}`,
+      location: newEventLocation,
+      region: 'Sua Região',
+      organizer: 'Você',
+      confirmedCount: 1,
+      timestamp: new Date(`${newEventDate}T${newEventTime || '00:00'}`).toISOString(),
+      gallery: newEventImages.length > 0 ? newEventImages : undefined,
+      image: newEventImages.length > 0 ? newEventImages[0] : 'https://picsum.photos/seed/new/800/600',
+      isLive: false
+    };
+
+    setEvents([newEvent, ...events]);
+    setShowEventModal(false);
+    setNewEventTitle('');
+    setNewEventDate('');
+    setNewEventTime('');
+    setNewEventLocation('');
+    setNewEventDescription('');
+    setNewEventImages([]);
+    showToast('Evento criado com sucesso!');
+  };
+
+  const handleCreatePoll = () => {
+    if (!newPollQuestion.trim() || newPollOptions.filter(o => o.trim()).length < 2) {
+      showToast('Preencha a pergunta e pelo menos 2 opções.');
+      return;
+    }
+    
+    const validOptions = newPollOptions.filter(o => o.trim());
+    
+    const newPoll = {
+      id: `poll-${Date.now()}`,
+      question: newPollQuestion,
+      options: validOptions.map((opt, idx) => ({
+        id: `opt-${idx}`,
+        text: opt,
+        votes: 0,
+        percent: 0
+      })),
+      totalVotes: 0,
+      createdBy: {
+        name: 'Você',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
+      },
+      timeLeft: newPollDuration
+    };
+    
+    setPolls([newPoll, ...polls]);
+    setShowPetitionModal(false);
+    setNewPollQuestion('');
+    setNewPollOptions(['', '', '']);
+    showToast('Enquete lançada com sucesso!');
+  };
+
+  const handleCreatePetition = () => {
+    if (!newPetitionTitle.trim() || !newPetitionDescription.trim() || !newPetitionGoal) {
+      showToast('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    
+    const newPetition = {
+      id: `pet-${Date.now()}`,
+      title: newPetitionTitle,
+      description: newPetitionDescription,
+      targetGoal: parseInt(newPetitionGoal) || 1000,
+      currentSignatures: 0,
+      createdBy: {
+        name: 'Você',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop'
+      },
+      attachments: newPetitionAttachments
+    };
+    
+    setPetitions([newPetition, ...petitions]);
+    setShowPetitionModal(false);
+    setNewPetitionTitle('');
+    setNewPetitionDescription('');
+    setNewPetitionGoal('');
+    setNewPetitionAttachments([]);
+    showToast('Petição criada com sucesso!');
+  };
+
+  const handleSignPetition = (id: string) => {
+    if (signedPetitions[id]) return;
+    
+    setSignedPetitions(prev => ({ ...prev, [id]: true }));
+    setPetitions(prev => prev.map(pet => {
+      if (pet.id === id) {
+        return { ...pet, currentSignatures: pet.currentSignatures + 1 };
+      }
+      return pet;
+    }));
+    showToast('Petição assinada com sucesso!');
+  };
+
+  const [now] = useState(() => Date.now());
+
   // Memoized Sorted & Filtered Events
   const displayedEvents = useMemo(() => {
-    let events = [...ACTIONS_DATA];
+    let filteredEvents = [...events];
 
     // Filter by type
     if (eventFilter !== 'ALL') {
-      events = events.filter(e => e.type === eventFilter);
+      filteredEvents = filteredEvents.filter(e => e.type === eventFilter);
     }
 
     // Filter by Region
     if (regionFilter !== 'ALL') {
-       events = events.filter(e => e.region === regionFilter);
+       filteredEvents = filteredEvents.filter(e => e.region === regionFilter);
+    }
+
+    // Filter by Status
+    if (statusFilter !== 'ALL') {
+      if (statusFilter === 'LIVE') {
+        filteredEvents = filteredEvents.filter(e => e.date === 'AGORA!' || e.isLive);
+      } else if (statusFilter === 'FUTURE') {
+        filteredEvents = filteredEvents.filter(e => e.date !== 'AGORA!' && !e.isLive && new Date(e.timestamp).getTime() >= now);
+      } else if (statusFilter === 'PAST') {
+        filteredEvents = filteredEvents.filter(e => e.date !== 'AGORA!' && !e.isLive && new Date(e.timestamp).getTime() < now);
+      }
+    }
+
+    // Filter by Date (simplified logic for demo)
+    if (dateFilter !== 'ALL') {
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (dateFilter === 'TODAY') {
+        filteredEvents = filteredEvents.filter(e => e.date === 'AGORA!' || e.date.toLowerCase().includes('hoje') || (new Date(e.timestamp).getTime() - now < oneDay && new Date(e.timestamp).getTime() > now - oneDay));
+      } else if (dateFilter === 'WEEK') {
+        filteredEvents = filteredEvents.filter(e => new Date(e.timestamp).getTime() - now < 7 * oneDay && new Date(e.timestamp).getTime() > now - oneDay);
+      } else if (dateFilter === '15_DAYS') {
+        filteredEvents = filteredEvents.filter(e => new Date(e.timestamp).getTime() - now < 15 * oneDay && new Date(e.timestamp).getTime() > now - oneDay);
+      }
     }
 
     // Sort by Date (Nearest first)
-    events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    filteredEvents.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    return events;
-  }, [eventFilter, regionFilter]);
+    return filteredEvents;
+  }, [events, eventFilter, regionFilter, statusFilter, dateFilter, now]);
 
   const uniqueRegions = useMemo(() => {
-     const regions = new Set(ACTIONS_DATA.map(a => a.region).filter(Boolean));
+     const regions = new Set(events.map(a => a.region).filter(Boolean));
      return Array.from(regions);
-  }, []);
+  }, [events]);
 
   const toggleAttendance = (id: string) => {
-    setAttendanceState(prev => ({
-       ...prev,
-       [id]: !prev[id]
-    }));
+    setAttendanceState(prev => {
+       const isAttending = !prev[id];
+       if (isAttending) {
+         showToast('Presença confirmada! Nos vemos lá.');
+       } else {
+         showToast('Presença cancelada.');
+       }
+       return {
+         ...prev,
+         [id]: isAttending
+       };
+    });
   };
 
   const handleCarousel = (id: string, direction: 'prev' | 'next', length: number, e: React.MouseEvent) => {
@@ -174,6 +385,30 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                      <option value="ALL">Todas as Regiões</option>
                      {uniqueRegions.map(r => <option key={r} value={r as string}>{r}</option>)}
                   </select>
+
+                  {/* Date Filter Dropdown */}
+                  <select 
+                     className="px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-white text-gray-600 focus:outline-none focus:border-red-600"
+                     value={dateFilter}
+                     onChange={(e) => setDateFilter(e.target.value as any)}
+                  >
+                     <option value="ALL">Qualquer Data</option>
+                     <option value="TODAY">Hoje</option>
+                     <option value="WEEK">Esta Semana</option>
+                     <option value="15_DAYS">Próximos 15 dias</option>
+                  </select>
+
+                  {/* Status Filter Dropdown */}
+                  <select 
+                     className="px-3 py-1.5 rounded-full text-xs font-bold border border-gray-300 bg-white text-gray-600 focus:outline-none focus:border-red-600"
+                     value={statusFilter}
+                     onChange={(e) => setStatusFilter(e.target.value as any)}
+                  >
+                     <option value="ALL">Qualquer Status</option>
+                     <option value="LIVE">Ao Vivo</option>
+                     <option value="FUTURE">Futuro</option>
+                     <option value="PAST">Passado</option>
+                  </select>
                </div>
                
                <button 
@@ -184,107 +419,277 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                </button>
             </div>
             
-            {displayedEvents.map(action => {
-              const gallery = action.gallery && action.gallery.length > 0 ? action.gallery : (action.image ? [action.image] : []);
-              const currentImgIndex = carouselIndices[action.id] || 0;
-              const hasGallery = gallery.length > 1;
+            {viewMode === 'PAGINATED' && displayedEvents.length > 0 ? (
+              <div className="relative">
+                {/* Single Event Display */}
+                {(() => {
+                  const action = displayedEvents[currentEventIndex];
+                  const gallery = action.gallery && action.gallery.length > 0 ? action.gallery : (action.image ? [action.image] : []);
+                  const currentImgIndex = carouselIndices[action.id] || 0;
+                  const hasGallery = gallery.length > 1;
 
-              return (
-              <div key={action.id} className="border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow bg-white relative">
-                {/* Event Type Badge - Prominent */}
-                <div className="absolute top-3 left-3 z-10">
-                   <div className={`shadow-md text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2 ${action.type === 'PROTEST' ? 'bg-red-600' : 'bg-blue-600'}`}>
-                      {action.type === 'PROTEST' ? <Megaphone size={14}/> : <Users size={14}/>}
-                      {action.type === 'PROTEST' ? 'PROTESTO' : 'ENCONTRO'}
-                   </div>
+                  return (
+                    <div key={action.id} className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white relative animate-in fade-in duration-300">
+                      {/* Event Type Badge - Prominent */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <div className={`shadow-md text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2 ${action.type === 'PROTEST' ? 'bg-red-600' : 'bg-blue-600'}`}>
+                            {action.type === 'PROTEST' ? <Megaphone size={14}/> : <Users size={14}/>}
+                            {action.type === 'PROTEST' ? 'PROTESTO' : 'ENCONTRO'}
+                        </div>
+                      </div>
+
+                      {gallery.length > 0 && (
+                        <div className="h-56 w-full bg-gray-200 relative group cursor-pointer" onClick={() => setFullscreenImage(gallery[currentImgIndex])}>
+                          <img 
+                              src={gallery[currentImgIndex]} 
+                              className="w-full h-full object-cover transition-transform duration-500" 
+                              alt="Event" 
+                              loading="lazy"
+                          />
+                          
+                          {/* Carousel Controls */}
+                          {hasGallery && (
+                              <>
+                                <button 
+                                    onClick={(e) => handleCarousel(action.id, 'prev', gallery.length, e)}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+                                <button 
+                                    onClick={(e) => handleCarousel(action.id, 'next', gallery.length, e)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
+                                {/* Dots */}
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                    {gallery.map((_, idx) => (
+                                      <div key={idx} className={`w-1.5 h-1.5 rounded-full shadow-sm ${idx === currentImgIndex ? 'bg-white' : 'bg-white/50'}`}></div>
+                                    ))}
+                                </div>
+                              </>
+                          )}
+
+                          <button 
+                              className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                              <Maximize2 size={18} />
+                          </button>
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-lg text-gray-900 leading-tight flex-1 mr-2">{action.title}</h4>
+                          {/* Time Badge (Sorting indicator) */}
+                          <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
+                              <Clock size={10} /> {action.date === 'AGORA!' ? 'AO VIVO' : 'Em breve'}
+                          </span>
+                        </div>
+                        
+                        <div className="mt-3 space-y-2 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-red-600" />
+                            <span>{action.date}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-red-600" />
+                            <span>{action.location} {action.region && <span className="text-gray-400">({action.region})</span>}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Users size={16} className="text-red-600" />
+                            <span>
+                                {attendanceState[action.id] ? action.confirmedCount + 1 : action.confirmedCount} confirmados • Organizado por {action.organizer}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-4">
+                          <button 
+                            onClick={() => toggleAttendance(action.id)}
+                            className={`flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 ${attendanceState[action.id] ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-900 text-white hover:bg-black'}`}
+                          >
+                            {attendanceState[action.id] ? <CheckCircle2 size={18} /> : null}
+                            {attendanceState[action.id] ? 'Presença Confirmada' : 'Eu vou!'}
+                          </button>
+                          <button 
+                            onClick={() => toggleSaveAction(action.id)}
+                            className={`px-4 border border-gray-300 rounded-full font-bold transition-colors flex items-center justify-center ${savedActions[action.id] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-700 hover:bg-gray-50'}`}
+                            title={savedActions[action.id] ? "Salvo" : "Salvar evento"}
+                          >
+                            <Bookmark size={20} fill={savedActions[action.id] ? "currentColor" : "none"} className={savedActions[action.id] ? "text-blue-600" : "text-gray-500"} />
+                          </button>
+                          {action.lat && action.lng && (
+                              <button 
+                                onClick={() => onNavigateToMap(action.lat!, action.lng!)}
+                                className="px-4 border border-gray-300 rounded-full font-bold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                                title="Ver local no mapa"
+                              >
+                                <MapPin size={20} className="text-red-600" />
+                              </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Pagination Controls */}
+                <div className="flex justify-between items-center mt-4">
+                   <button 
+                     onClick={() => setCurrentEventIndex(prev => Math.max(0, prev - 1))}
+                     disabled={currentEventIndex === 0}
+                     className="flex items-center gap-1 px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     <ChevronLeft size={16} /> Anterior
+                   </button>
+                   <span className="text-xs font-bold text-gray-500">
+                     {currentEventIndex + 1} de {displayedEvents.length}
+                   </span>
+                   <button 
+                     onClick={() => setCurrentEventIndex(prev => Math.min(displayedEvents.length - 1, prev + 1))}
+                     disabled={currentEventIndex === displayedEvents.length - 1}
+                     className="flex items-center gap-1 px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                   >
+                     Próximo <ChevronRight size={16} />
+                   </button>
                 </div>
-
-                {gallery.length > 0 && (
-                  <div className="h-56 w-full bg-gray-200 relative group cursor-pointer" onClick={() => setFullscreenImage(gallery[currentImgIndex])}>
-                     <img 
-                        src={gallery[currentImgIndex]} 
-                        className="w-full h-full object-cover transition-transform duration-500" 
-                        alt="Event" 
-                     />
-                     
-                     {/* Carousel Controls */}
-                     {hasGallery && (
-                        <>
-                           <button 
-                              onClick={(e) => handleCarousel(action.id, 'prev', gallery.length, e)}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                           >
-                              <ChevronLeft size={20} />
-                           </button>
-                           <button 
-                              onClick={(e) => handleCarousel(action.id, 'next', gallery.length, e)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                           >
-                              <ChevronRight size={20} />
-                           </button>
-                           {/* Dots */}
-                           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                              {gallery.map((_, idx) => (
-                                 <div key={idx} className={`w-1.5 h-1.5 rounded-full shadow-sm ${idx === currentImgIndex ? 'bg-white' : 'bg-white/50'}`}></div>
-                              ))}
-                           </div>
-                        </>
-                     )}
-
-                     <button 
-                        className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                     >
-                        <Maximize2 size={18} />
-                     </button>
-                  </div>
-                )}
-                <div className="p-4">
-                  <div className="flex justify-between items-start">
-                     <h4 className="font-bold text-lg text-gray-900 leading-tight flex-1 mr-2">{action.title}</h4>
-                     {/* Time Badge (Sorting indicator) */}
-                     <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
-                        <Clock size={10} /> Em breve
-                     </span>
-                  </div>
-                  
-                  <div className="mt-3 space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={16} className="text-red-600" />
-                      <span>{action.date}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={16} className="text-red-600" />
-                      <span>{action.location} {action.region && <span className="text-gray-400">({action.region})</span>}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users size={16} className="text-red-600" />
-                      <span>
-                         {attendanceState[action.id] ? action.confirmedCount + 1 : action.confirmedCount} confirmados • Organizado por {action.organizer}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2 mt-4">
-                    <button 
-                     onClick={() => toggleAttendance(action.id)}
-                     className={`flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 ${attendanceState[action.id] ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-900 text-white hover:bg-black'}`}
-                    >
-                      {attendanceState[action.id] ? <CheckCircle2 size={18} /> : null}
-                      {attendanceState[action.id] ? 'Presença Confirmada' : 'Eu vou!'}
-                    </button>
-                    {action.lat && action.lng && (
-                       <button 
-                          onClick={() => onNavigateToMap(action.lat!, action.lng!)}
-                          className="px-4 border border-gray-300 rounded-full font-bold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
-                          title="Ver local no mapa"
-                       >
-                          <MapPin size={20} className="text-red-600" />
-                       </button>
-                    )}
-                  </div>
+                <div className="flex justify-center mt-2">
+                   <button 
+                     onClick={() => setViewMode('ALL')}
+                     className="text-sm font-bold text-red-600 hover:underline"
+                   >
+                     Ver todos os eventos
+                   </button>
                 </div>
               </div>
-            )})}
+            ) : displayedEvents.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                <Calendar size={48} className="mx-auto mb-2 text-gray-300" />
+                <p>Nenhum evento encontrado com os filtros atuais.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-2">
+                   <h3 className="font-bold text-gray-900">Todos os Eventos</h3>
+                   <button 
+                     onClick={() => { setViewMode('PAGINATED'); setCurrentEventIndex(0); }}
+                     className="text-sm font-bold text-red-600 hover:underline"
+                   >
+                     Voltar para navegação
+                   </button>
+                </div>
+                {displayedEvents.map(action => {
+                  const gallery = action.gallery && action.gallery.length > 0 ? action.gallery : (action.image ? [action.image] : []);
+                  const currentImgIndex = carouselIndices[action.id] || 0;
+                  const hasGallery = gallery.length > 1;
+
+                  return (
+                  <div key={action.id} className="border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow bg-white relative">
+                    {/* Event Type Badge - Prominent */}
+                    <div className="absolute top-3 left-3 z-10">
+                      <div className={`shadow-md text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2 ${action.type === 'PROTEST' ? 'bg-red-600' : 'bg-blue-600'}`}>
+                          {action.type === 'PROTEST' ? <Megaphone size={14}/> : <Users size={14}/>}
+                          {action.type === 'PROTEST' ? 'PROTESTO' : 'ENCONTRO'}
+                      </div>
+                    </div>
+
+                    {gallery.length > 0 && (
+                      <div className="h-56 w-full bg-gray-200 relative group cursor-pointer" onClick={() => setFullscreenImage(gallery[currentImgIndex])}>
+                        <img 
+                            src={gallery[currentImgIndex]} 
+                            className="w-full h-full object-cover transition-transform duration-500" 
+                            alt="Event" 
+                            loading="lazy"
+                        />
+                        
+                        {/* Carousel Controls */}
+                        {hasGallery && (
+                            <>
+                              <button 
+                                  onClick={(e) => handleCarousel(action.id, 'prev', gallery.length, e)}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                  <ChevronLeft size={20} />
+                              </button>
+                              <button 
+                                  onClick={(e) => handleCarousel(action.id, 'next', gallery.length, e)}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                  <ChevronRight size={20} />
+                              </button>
+                              {/* Dots */}
+                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                  {gallery.map((_, idx) => (
+                                    <div key={idx} className={`w-1.5 h-1.5 rounded-full shadow-sm ${idx === currentImgIndex ? 'bg-white' : 'bg-white/50'}`}></div>
+                                  ))}
+                              </div>
+                            </>
+                        )}
+
+                        <button 
+                            className="absolute bottom-2 right-2 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Maximize2 size={18} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-bold text-lg text-gray-900 leading-tight flex-1 mr-2">{action.title}</h4>
+                        {/* Time Badge (Sorting indicator) */}
+                        <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
+                            <Clock size={10} /> {action.date === 'AGORA!' ? 'AO VIVO' : 'Em breve'}
+                        </span>
+                      </div>
+                      
+                      <div className="mt-3 space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={16} className="text-red-600" />
+                          <span>{action.date}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin size={16} className="text-red-600" />
+                          <span>{action.location} {action.region && <span className="text-gray-400">({action.region})</span>}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users size={16} className="text-red-600" />
+                          <span>
+                              {attendanceState[action.id] ? action.confirmedCount + 1 : action.confirmedCount} confirmados • Organizado por {action.organizer}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2 mt-4">
+                        <button 
+                          onClick={() => toggleAttendance(action.id)}
+                          className={`flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 ${attendanceState[action.id] ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-900 text-white hover:bg-black'}`}
+                        >
+                          {attendanceState[action.id] ? <CheckCircle2 size={18} /> : null}
+                          {attendanceState[action.id] ? 'Presença Confirmada' : 'Eu vou!'}
+                        </button>
+                        <button 
+                          onClick={() => toggleSaveAction(action.id)}
+                          className={`px-4 border border-gray-300 rounded-full font-bold transition-colors flex items-center justify-center ${savedActions[action.id] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-700 hover:bg-gray-50'}`}
+                          title={savedActions[action.id] ? "Salvo" : "Salvar evento"}
+                        >
+                          <Bookmark size={20} fill={savedActions[action.id] ? "currentColor" : "none"} className={savedActions[action.id] ? "text-blue-600" : "text-gray-500"} />
+                        </button>
+                        {action.lat && action.lng && (
+                            <button 
+                              onClick={() => onNavigateToMap(action.lat!, action.lng!)}
+                              className="px-4 border border-gray-300 rounded-full font-bold text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center"
+                              title="Ver local no mapa"
+                            >
+                              <MapPin size={20} className="text-red-600" />
+                            </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )})}
+              </div>
+            )}
           </div>
         )}
 
@@ -325,7 +730,14 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                          <span>{fc.date}</span>
                       </div>
                    </div>
-                   <div className="p-2 bg-gray-50 border-t border-gray-100 flex justify-center">
+                   <div className="p-2 bg-gray-50 border-t border-gray-100 flex justify-between px-4">
+                      <button 
+                        onClick={() => toggleSaveAction(fc.id)}
+                        className={`font-bold text-sm flex items-center gap-2 ${savedActions[fc.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
+                      >
+                        <Bookmark size={16} fill={savedActions[fc.id] ? "currentColor" : "none"} />
+                        {savedActions[fc.id] ? 'Salvo' : 'Salvar'}
+                      </button>
                       <button className="text-blue-600 font-bold text-sm flex items-center gap-2">
                         Compartilhar Verdade
                       </button>
@@ -363,7 +775,7 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                 <Vote size={20} className="text-blue-600"/> Enquetes da Comunidade
               </h3>
               <div className="space-y-4">
-                {POLLS_DATA.map(poll => (
+                {polls.map(poll => (
                   <div key={poll.id} className="border border-gray-200 rounded-2xl p-4 bg-white">
                     <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
                       <img src={poll.createdBy.avatar} className="w-5 h-5 rounded-full" />
@@ -372,21 +784,37 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                     <h4 className="font-bold text-gray-900 mb-3 text-lg">{poll.question}</h4>
                     
                     <div className="space-y-2">
-                      {poll.options.map(option => (
-                        <div key={option.id} className="relative h-10 w-full bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:bg-gray-200 transition-colors">
+                      {poll.options.map(option => {
+                        const isVoted = votedPolls[poll.id] === option.id;
+                        const hasVotedAny = !!votedPolls[poll.id];
+                        return (
+                        <div 
+                          key={option.id} 
+                          onClick={() => handleVote(poll.id, option.id)}
+                          className={`relative h-10 w-full rounded-lg overflow-hidden transition-colors ${hasVotedAny ? 'cursor-default' : 'cursor-pointer hover:bg-gray-200'} ${isVoted ? 'bg-blue-50 border border-blue-200' : 'bg-gray-100'}`}
+                        >
                            {/* Progress Bar Background */}
-                           <div className="absolute top-0 left-0 h-full bg-blue-100 transition-all duration-1000" style={{ width: `${option.percent}%` }}></div>
+                           {hasVotedAny && (
+                             <div className={`absolute top-0 left-0 h-full transition-all duration-1000 ${isVoted ? 'bg-blue-200' : 'bg-gray-200'}`} style={{ width: `${option.percent}%` }}></div>
+                           )}
                            
                            {/* Text Content */}
                            <div className="absolute inset-0 flex justify-between items-center px-4 z-10">
-                              <span className="font-medium text-gray-900 text-sm">{option.text}</span>
-                              <span className="font-bold text-gray-900 text-sm">{option.percent}%</span>
+                              <span className={`font-medium text-sm ${isVoted ? 'text-blue-900 font-bold' : 'text-gray-900'}`}>{option.text}</span>
+                              {hasVotedAny && <span className={`font-bold text-sm ${isVoted ? 'text-blue-900' : 'text-gray-900'}`}>{option.percent}%</span>}
                            </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
-                    <div className="mt-3 text-xs text-gray-500">
-                      {poll.totalVotes.toLocaleString()} votos totais
+                    <div className="mt-3 flex justify-between items-center text-xs text-gray-500">
+                      <span>{poll.totalVotes.toLocaleString()} votos totais</span>
+                      <button 
+                        onClick={() => toggleSaveAction(poll.id)}
+                        className={`flex items-center gap-1 font-bold transition-colors ${savedActions[poll.id] ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'}`}
+                      >
+                        <Bookmark size={14} fill={savedActions[poll.id] ? "currentColor" : "none"} />
+                        {savedActions[poll.id] ? 'Salvo' : 'Salvar'}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -399,7 +827,7 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                 <FileText size={20} className="text-green-600"/> Petições em Alta
               </h3>
               <div className="space-y-4">
-                {PETITIONS_DATA.map(pet => (
+                {petitions.map(pet => (
                   <div key={pet.id} className="border border-gray-200 rounded-2xl p-4 bg-white">
                     <div className="flex items-center gap-2 mb-2">
                         <img src={pet.createdBy.avatar} className="w-6 h-6 rounded-full" />
@@ -434,9 +862,22 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                         <span>Meta: {pet.targetGoal.toLocaleString()}</span>
                     </div>
                     
-                    <button className="w-full border border-gray-300 text-red-600 font-bold py-2 rounded-full hover:bg-red-50 transition-colors">
-                        Assinar Agora
-                    </button>
+                    <div className="flex gap-2">
+                       <button 
+                         onClick={() => handleSignPetition(pet.id)}
+                         disabled={signedPetitions[pet.id]}
+                         className={`flex-1 border font-bold py-2 rounded-full transition-colors ${signedPetitions[pet.id] ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed' : 'border-gray-300 text-red-600 hover:bg-red-50'}`}
+                       >
+                           {signedPetitions[pet.id] ? 'Assinada' : 'Assinar Agora'}
+                       </button>
+                       <button 
+                         onClick={() => toggleSaveAction(pet.id)}
+                         className={`px-4 border border-gray-300 rounded-full font-bold transition-colors flex items-center justify-center ${savedActions[pet.id] ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-700 hover:bg-gray-50'}`}
+                         title={savedActions[pet.id] ? "Salvo" : "Salvar petição"}
+                       >
+                         <Bookmark size={20} fill={savedActions[pet.id] ? "currentColor" : "none"} className={savedActions[pet.id] ? "text-blue-600" : "text-gray-500"} />
+                       </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -568,7 +1009,7 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
             <button className="absolute top-4 right-4 text-white p-2 hover:bg-white/20 rounded-full" onClick={() => setFullscreenImage(null)}>
                <X size={32} />
             </button>
-            <img src={fullscreenImage} className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+            <img src={fullscreenImage} className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} loading="lazy" />
          </div>
       )}
 
@@ -586,21 +1027,26 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
               <div className="space-y-4">
                  <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Título do Evento</label>
-                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Ato na Praça X" />
+                    <input type="text" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Ato na Praça X" />
                  </div>
                  <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Data</label>
-                        <input type="date" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                        <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Horário</label>
-                        <input type="time" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" />
+                        <input type="time" value={newEventTime} onChange={e => setNewEventTime(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" />
                     </div>
                  </div>
                  <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Local</label>
-                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Endereço ou ponto de referência" />
+                    <input type="text" value={newEventLocation} onChange={e => setNewEventLocation(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Endereço ou ponto de referência" />
+                 </div>
+                 
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Descrição</label>
+                    <textarea rows={3} value={newEventDescription} onChange={e => setNewEventDescription(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Detalhes do evento..."></textarea>
                  </div>
                  
                  {/* Upload Multiple Images UI Mock */}
@@ -649,12 +1095,12 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                  <div>
                     <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Evento</label>
                     <div className="flex gap-2">
-                       <button className="flex-1 py-2 border border-red-600 bg-red-50 text-red-600 rounded-lg font-bold text-sm">Protesto</button>
-                       <button className="flex-1 py-2 border border-gray-300 bg-white text-gray-600 rounded-lg font-bold text-sm hover:bg-gray-50">Encontro</button>
+                       <button onClick={() => setNewEventType('PROTEST')} className={`flex-1 py-2 border rounded-lg font-bold text-sm transition-colors ${newEventType === 'PROTEST' ? 'border-red-600 bg-red-50 text-red-600' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>Protesto</button>
+                       <button onClick={() => setNewEventType('MEETING')} className={`flex-1 py-2 border rounded-lg font-bold text-sm transition-colors ${newEventType === 'MEETING' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'}`}>Encontro</button>
                     </div>
                  </div>
                  
-                 <button className="w-full bg-red-600 text-white py-3 rounded-full font-bold hover:bg-red-700 transition-colors mt-2" onClick={() => setShowEventModal(false)}>
+                 <button className="w-full bg-red-600 text-white py-3 rounded-full font-bold hover:bg-red-700 transition-colors mt-2" onClick={handleCreateEvent}>
                     Publicar Evento
                  </button>
               </div>
@@ -690,16 +1136,19 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                     <p className="text-sm text-gray-500 -mt-2 mb-2">Crie uma mobilização para sua causa com coleta de assinaturas.</p>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Título</label>
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Reforma da Escola X" />
+                        <input type="text" value={newPetitionTitle} onChange={e => setNewPetitionTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Reforma da Escola X" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Descrição</label>
-                        <textarea rows={3} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Explique o motivo..."></textarea>
+                        <textarea rows={3} value={newPetitionDescription} onChange={e => setNewPetitionDescription(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Explique o motivo..."></textarea>
                     </div>
                     
                     {/* Add Attachment Section */}
                     <div>
-                       <label className="block text-sm font-bold text-gray-700 mb-1">Anexar Documento ou Link (Líderes)</label>
+                       <label className="block text-sm font-bold text-gray-700 mb-1 flex items-center gap-2">
+                         Anexar Documento ou Link 
+                         <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full uppercase">Líderes Verificados</span>
+                       </label>
                        <div className="flex gap-2 mb-2">
                           <select 
                             value={currentAttachmentType}
@@ -746,10 +1195,10 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
 
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Meta de Assinaturas</label>
-                        <input type="number" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="1000" />
+                        <input type="number" value={newPetitionGoal} onChange={e => setNewPetitionGoal(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="1000" />
                     </div>
                     
-                    <button className="w-full bg-red-600 text-white py-3 rounded-full font-bold hover:bg-red-700 transition-colors mt-2" onClick={() => setShowPetitionModal(false)}>
+                    <button className="w-full bg-red-600 text-white py-3 rounded-full font-bold hover:bg-red-700 transition-colors mt-2" onClick={handleCreatePetition}>
                         Criar Petição
                     </button>
                 </div>
@@ -758,31 +1207,38 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                     <p className="text-sm text-gray-500 -mt-2 mb-2">Faça perguntas à comunidade e veja os resultados em tempo real.</p>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Pergunta</label>
-                        <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Qual a prioridade do bairro?" />
+                        <input type="text" value={newPollQuestion} onChange={e => setNewPollQuestion(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Ex: Qual a prioridade do bairro?" />
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-2">Opções de Resposta</label>
                         <div className="space-y-2">
-                           <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 1" />
-                           <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 2" />
-                           <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 3 (Opcional)" />
+                           <input type="text" value={newPollOptions[0]} onChange={e => setNewPollOptions([e.target.value, newPollOptions[1], newPollOptions[2]])} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 1" />
+                           <input type="text" value={newPollOptions[1]} onChange={e => setNewPollOptions([newPollOptions[0], e.target.value, newPollOptions[2]])} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 2" />
+                           <input type="text" value={newPollOptions[2]} onChange={e => setNewPollOptions([newPollOptions[0], newPollOptions[1], e.target.value])} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Opção 3 (Opcional)" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Duração</label>
-                        <select className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none">
-                           <option>24 horas</option>
-                           <option>3 dias</option>
-                           <option>1 semana</option>
+                        <select value={newPollDuration} onChange={e => setNewPollDuration(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none">
+                           <option value="24 horas">24 horas</option>
+                           <option value="3 dias">3 dias</option>
+                           <option value="1 semana">1 semana</option>
                         </select>
                     </div>
                     
-                    <button className="w-full bg-blue-600 text-white py-3 rounded-full font-bold hover:bg-blue-700 transition-colors mt-2" onClick={() => setShowPetitionModal(false)}>
+                    <button className="w-full bg-blue-600 text-white py-3 rounded-full font-bold hover:bg-blue-700 transition-colors mt-2" onClick={handleCreatePoll}>
                         Lançar Enquete
                     </button>
                 </div>
               )}
            </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-full shadow-lg text-sm font-medium z-50 animate-in slide-in-from-bottom-5">
+          {toastMessage}
         </div>
       )}
     </div>
