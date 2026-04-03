@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Home, Map as MapIcon, User as UserIcon, Bell, SquarePen, Star, MoreHorizontal, Megaphone, BarChart2, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Home, Map as MapIcon, User as UserIcon, Bell, SquarePen, Star, MoreHorizontal, Megaphone, BarChart2, Search, MessageSquare } from 'lucide-react';
 import { Feed } from './components/Feed';
 import { MapViz } from './components/MapViz';
 import { Trends } from './components/Trends';
@@ -8,7 +8,10 @@ import { LandingPage } from './components/LandingPage';
 import { ProfileDashboard } from './components/ProfileDashboard';
 import { EstrelinhaAI } from './components/EstrelinhaAI';
 import { Dashboard } from './components/Dashboard';
-import { CURRENT_USER, NOTIFICATIONS } from './constants';
+import { Chat } from './components/Chat';
+import { CURRENT_USER, NOTIFICATIONS, LEADERS_LIST } from './constants';
+import { auth } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 enum View {
   HOME = 'HOME',
@@ -16,7 +19,8 @@ enum View {
   ACTIONS = 'ACTIONS',
   PROFILE = 'PROFILE',
   NOTIFICATIONS = 'NOTIFICATIONS',
-  DASHBOARD = 'DASHBOARD'
+  DASHBOARD = 'DASHBOARD',
+  CHAT = 'CHAT'
 }
 
 // Mobile Bottom Navigation Item
@@ -61,6 +65,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<View>(View.HOME);
+  const [profileUser, setProfileUser] = useState<any>(CURRENT_USER);
+  const [user, setUser] = useState<any>(null);
   
   // New state to control map focus from ActionsHub
   const [mapTarget, setMapTarget] = useState<{lat: number, lng: number, zoom: number} | null>(null);
@@ -68,11 +74,19 @@ const App: React.FC = () => {
   // Fake notification state
   const hasNewActions = true; 
 
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setIsAuthenticated(true);
+        setUser(currentUser);
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
       setIsLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleNavigateToMap = (lat: number, lng: number) => {
@@ -91,7 +105,7 @@ const App: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage onLogin={() => setIsAuthenticated(true)} />;
+    return <LandingPage />;
   }
 
   return (
@@ -108,11 +122,43 @@ const App: React.FC = () => {
 
             <nav className="flex flex-col gap-1 w-full items-center xl:items-start">
               <SidebarItem view={View.HOME} icon={Home} label="Página Inicial" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+              
+              {/* Lideranças em Destaque */}
+              <div className="hidden xl:block w-full mt-4 mb-2 px-3">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Lideranças em Destaque</h3>
+                <div className="flex flex-col gap-2">
+                  {LEADERS_LIST.map((leader) => (
+                    <div 
+                      key={leader.id} 
+                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-100 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setProfileUser(leader);
+                        setCurrentView(View.PROFILE);
+                      }}
+                    >
+                      <img src={leader.avatar} alt={leader.name} className="w-8 h-8 rounded-full object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate flex items-center gap-1">
+                          {leader.name}
+                          {leader.isVerified && (
+                            <svg viewBox="0 0 24 24" aria-label="Conta verificada" className="w-3 h-3 text-red-600 fill-current flex-shrink-0"><g><path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.998-3.818-3.998-.47 0-.92.084-1.336.25C14.818 2.415 13.51 1.5 12 1.5s-2.816.917-3.437 2.25c-.415-.165-.866-.25-1.336-.25-2.11 0-3.818 1.79-3.818 4 0 .495.083.965.238 1.4-1.272.65-2.147 2.018-2.147 3.6 0 1.495.782 2.798 1.942 3.486-.02.17-.032.34-.032.514 0 2.21 1.708 4 3.818 4 .47 0 .92-.086 1.335-.25.62 1.334 1.926 2.25 3.437 2.25 1.512 0 2.818-.916 3.437-2.25.415.163.865.248 1.336.248 2.11 0 3.818-1.79 3.818-4 0-.174-.012-.344-.033-.513 1.158-.687 1.943-1.99 1.943-3.484zm-6.616-3.334l-4.334 6.5c-.145.217-.382.334-.625.334-.143 0-.288-.04-.416-.126l-.115-.094-2.415-2.415c-.293-.293-.293-.768 0-1.06s.768-.294 1.06 0l1.77 1.767 3.825-5.74c.23-.345.696-.436 1.04-.207.346.23.44.696.21 1.04z"></path></g></svg>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{leader.handle}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <SidebarItem view={View.ACTIONS} icon={Megaphone} label="Ações" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.MAP} icon={MapIcon} label="Mapa Militância" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+              <SidebarItem view={View.CHAT} icon={MessageSquare} label="Mensagens" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={false} />
               <SidebarItem view={View.DASHBOARD} icon={BarChart2} label="Métricas" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
               <SidebarItem view={View.NOTIFICATIONS} icon={Bell} label="Notificações" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
-              <SidebarItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+              <div onClick={() => setProfileUser(CURRENT_USER)}>
+                <SidebarItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+              </div>
             </nav>
 
             <button className="mt-8 bg-red-600 hover:bg-red-700 text-white rounded-full p-4 xl:py-3.5 xl:w-[90%] font-bold shadow-lg transition-transform hover:scale-105 flex justify-center items-center">
@@ -123,13 +169,13 @@ const App: React.FC = () => {
 
           <div className="mt-auto flex items-center gap-3 p-3 rounded-full hover:bg-gray-100 cursor-pointer transition-colors w-full">
             <img 
-              src={CURRENT_USER.avatar} 
+              src={user?.photoURL || CURRENT_USER.avatar} 
               alt="User" 
               className="w-10 h-10 rounded-full object-cover"
             />
             <div className="hidden xl:block flex-1 overflow-hidden">
-              <p className="font-bold text-sm text-gray-900 leading-tight truncate">{CURRENT_USER.name}</p>
-              <p className="text-gray-500 text-sm truncate">{CURRENT_USER.handle}</p>
+              <p className="font-bold text-sm text-gray-900 leading-tight truncate">{user?.displayName || CURRENT_USER.name}</p>
+              <p className="text-gray-500 text-sm truncate">{user?.email || CURRENT_USER.handle}</p>
             </div>
             <MoreHorizontal size={18} className="hidden xl:block text-gray-500" />
           </div>
@@ -154,6 +200,8 @@ const App: React.FC = () => {
           {currentView === View.ACTIONS && <ActionsHub onNavigateToMap={handleNavigateToMap} />}
 
           {currentView === View.MAP && <MapViz focusLocation={mapTarget} />}
+
+          {currentView === View.CHAT && <Chat />}
 
           {currentView === View.DASHBOARD && <Dashboard />}
           
@@ -211,12 +259,12 @@ const App: React.FC = () => {
           )}
 
           {currentView === View.PROFILE && (
-            <ProfileDashboard onBack={() => setCurrentView(View.HOME)} />
+            <ProfileDashboard user={profileUser} onBack={() => setCurrentView(View.HOME)} />
           )}
         </main>
 
         {/* Right Sidebar (News/Trends) - Hidden on smaller maps view */}
-        {currentView !== View.MAP && (
+        {currentView !== View.MAP && currentView !== View.CHAT && (
           <Trends />
         )}
       </div>
@@ -226,8 +274,10 @@ const App: React.FC = () => {
         <MobileNavItem view={View.HOME} icon={Home} label="Início" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
         <MobileNavItem view={View.ACTIONS} icon={Megaphone} label="Ações" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
         <MobileNavItem view={View.MAP} icon={MapIcon} label="Mapa" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
-        <MobileNavItem view={View.NOTIFICATIONS} icon={Bell} label="Avisos" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
-        <MobileNavItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+        <MobileNavItem view={View.CHAT} icon={MessageSquare} label="Mensagens" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={false} />
+        <div onClick={() => setProfileUser(CURRENT_USER)}>
+          <MobileNavItem view={View.PROFILE} icon={UserIcon} label="Perfil" currentView={currentView} setCurrentView={setCurrentView} hasNewActions={hasNewActions} />
+        </div>
       </div>
 
       <EstrelinhaAI />

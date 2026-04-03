@@ -1,7 +1,43 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Star, Users, Map as MapIcon, Megaphone } from 'lucide-react';
+import { auth, db } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-export const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
+export const LandingPage = () => {
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user exists in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // Create new user profile
+        await setDoc(userRef, {
+          uid: user.uid,
+          name: user.displayName || 'Usuário',
+          email: user.email || '',
+          avatar: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
+          role: 'user',
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error("Error signing in with Google", error);
+      alert("Erro ao fazer login com o Google. Tente novamente.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
@@ -10,8 +46,8 @@ export const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
           <Star size={32} className="fill-current" />
           <span className="text-xl font-bold tracking-tight">Rede Estrela MG</span>
         </div>
-        <button onClick={onLogin} className="px-5 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition-colors">
-          Entrar
+        <button onClick={handleLogin} disabled={isLoggingIn} className="px-5 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition-colors disabled:opacity-50">
+          {isLoggingIn ? 'Entrando...' : 'Entrar'}
         </button>
       </header>
       
@@ -23,8 +59,8 @@ export const LandingPage = ({ onLogin }: { onLogin: () => void }) => {
         <p className="text-xl text-gray-600 mb-10 max-w-2xl">
           Uma plataforma de engajamento social e mapeamento para fortalecer o PT e os movimentos sociais. Conecte-se, participe de ações e acompanhe seu impacto.
         </p>
-        <button onClick={onLogin} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2">
-          Fazer parte da Rede <Star size={20} className="fill-current" />
+        <button onClick={handleLogin} disabled={isLoggingIn} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
+          {isLoggingIn ? 'Autenticando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
         </button>
 
         {/* Features */}

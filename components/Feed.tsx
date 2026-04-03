@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Heart, MessageCircle, Repeat, Share2, Image as ImageIcon, Smile, MapPin, ArrowUpDown, X, Maximize2, Bookmark } from 'lucide-react';
 import { MOCK_POSTS, CURRENT_USER } from '../constants';
 import { Post } from '../types';
+import { auth } from '../firebase';
 
 export const Feed: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
@@ -13,35 +14,48 @@ export const Feed: React.FC = () => {
   const [sortByPopularity, setSortByPopularity] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const MOCK_NEWS = [
-    {
-      id: 'news1',
-      title: 'Governo Federal anuncia novos investimentos do PAC em Minas Gerais',
-      source: 'PT Brasil',
-      time: '2h',
-      content: 'Obras de infraestrutura e mobilidade urbana vão beneficiar mais de 2 milhões de mineiros na região metropolitana de Belo Horizonte.',
-      image: 'https://picsum.photos/seed/pacmg/600/300',
-      link: '#'
-    },
-    {
-      id: 'news2',
-      title: 'Bolsa Família alcança marca histórica de famílias atendidas no Vale do Jequitinhonha',
-      source: 'Ministério do Desenvolvimento',
-      time: '5h',
-      content: 'Com o novo reajuste, o programa social garante segurança alimentar e dignidade para milhares de famílias na região.',
-      image: 'https://picsum.photos/seed/bolsafamiliamg/600/300',
-      link: '#'
-    },
-    {
-      id: 'news3',
-      title: 'Deputados do PT-MG aprovam projeto de proteção ambiental para a Serra do Curral',
-      source: 'ALMG',
-      time: '1d',
-      content: 'A proposta visa barrar a mineração predatória e garantir a preservação de um dos maiores símbolos da capital mineira.',
-      image: 'https://picsum.photos/seed/serradocurral/600/300',
-      link: '#'
+  // News states
+  const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
+
+  const currentUser = auth.currentUser;
+  const activeUser = currentUser ? {
+    name: currentUser.displayName || 'Usuário',
+    handle: `@${currentUser.email?.split('@')[0] || 'usuario'}`,
+    avatar: currentUser.photoURL || CURRENT_USER.avatar,
+    isVerified: true
+  } : CURRENT_USER;
+
+  useEffect(() => {
+    if (activeTab === 'NEWS' && newsItems.length === 0) {
+      fetchNews();
     }
-  ];
+  }, [activeTab]);
+
+  const fetchNews = async () => {
+    setIsLoadingNews(true);
+    try {
+      const response = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://pt.org.br/feed/');
+      const data = await response.json();
+      if (data.status === 'ok') {
+        const formattedNews = data.items.map((item: any) => ({
+          id: item.guid,
+          title: item.title,
+          source: 'PT Brasil',
+          time: new Date(item.pubDate).toLocaleDateString('pt-BR'),
+          content: item.description.replace(/<[^>]+>/g, '').substring(0, 150) + '...',
+          image: item.thumbnail || item.enclosure?.link || 'https://picsum.photos/seed/ptbrasil/600/300',
+          link: item.link
+        }));
+        setNewsItems(formattedNews);
+      }
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      showToast("Erro ao carregar notícias.");
+    } finally {
+      setIsLoadingNews(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -113,7 +127,7 @@ export const Feed: React.FC = () => {
 
     const newPost: Post = {
       id: Date.now().toString(),
-      user: CURRENT_USER,
+      user: activeUser,
       content: newPostContent,
       timestamp: 'Agora',
       likes: '0',
@@ -126,9 +140,21 @@ export const Feed: React.FC = () => {
     setNewPostContent('');
   };
 
-  const handleShare = (e: React.MouseEvent) => {
+  const handleShare = async (e: React.MouseEvent, post: Post) => {
     e.stopPropagation();
-    showToast('Link copiado para a área de transferência!');
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Post de ${post.user.name}`,
+          text: post.content,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      showToast('Link copiado para a área de transferência!');
+    }
   };
 
   return (
@@ -163,7 +189,7 @@ export const Feed: React.FC = () => {
              className="hover:bg-gray-100 transition-colors py-4 relative flex justify-center"
           >
             <span className={`font-bold text-sm ${activeTab === 'NEWS' ? 'text-gray-900' : 'text-gray-500'}`}>
-              Notícias
+              Notícias MG
             </span>
             {activeTab === 'NEWS' && (
               <div className="absolute bottom-0 w-16 h-1 bg-red-600 rounded-full"></div>
@@ -188,7 +214,7 @@ export const Feed: React.FC = () => {
         <div className="px-4 py-3 border-b border-gray-200 hidden sm:block">
           <div className="flex gap-4">
             <img 
-              src={CURRENT_USER.avatar} 
+              src={activeUser.avatar} 
               alt="Avatar" 
               className="w-10 h-10 rounded-full object-cover flex-shrink-0"
             />
@@ -326,7 +352,7 @@ export const Feed: React.FC = () => {
   
                     <button 
                       className="group flex items-center cursor-pointer hover:text-blue-500"
-                      onClick={handleShare}
+                      onClick={(e) => handleShare(e, post)}
                     >
                       <div className="p-2 group-hover:bg-blue-50 rounded-full transition-colors">
                         <Share2 size={18} />
@@ -339,40 +365,50 @@ export const Feed: React.FC = () => {
       ) : (
         <div className="bg-gray-50 min-h-screen">
           <div className="p-4 bg-white border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Notícias e Conquistas</h2>
-            <p className="text-gray-500 text-sm mt-1">Acompanhe as ações do PT em Minas Gerais</p>
+            <h2 className="text-xl font-bold text-gray-900">Notícias Oficiais do PT</h2>
+            <p className="text-gray-500 text-sm mt-1">Acompanhe as últimas atualizações do portal pt.org.br</p>
           </div>
           <div className="flex flex-col">
-            {MOCK_NEWS.map((news) => (
-              <article key={news.id} className="bg-white border-b border-gray-200 p-4 hover:bg-gray-50 transition-colors cursor-pointer">
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                      <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{news.source}</span>
-                      <span>·</span>
-                      <span>{news.time}</span>
+            {isLoadingNews ? (
+              <div className="p-8 text-center text-gray-500">
+                Carregando notícias...
+              </div>
+            ) : newsItems.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                Nenhuma notícia encontrada no momento.
+              </div>
+            ) : (
+              newsItems.map((news) => (
+                <article key={news.id} onClick={() => window.open(news.link, '_blank')} className="bg-white border-b border-gray-200 p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                        <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{news.source}</span>
+                        <span>·</span>
+                        <span>{news.time}</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 leading-tight mb-2 hover:text-red-600 transition-colors">
+                        {news.title}
+                      </h3>
+                      <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                        {news.content}
+                      </p>
+                      <div className="flex items-center gap-4 text-gray-500">
+                        <button className="flex items-center gap-1.5 hover:text-red-600 transition-colors text-xs font-medium">
+                          <Share2 size={14} /> Compartilhar
+                        </button>
+                        <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors text-xs font-medium">
+                          <Bookmark size={14} /> Salvar
+                        </button>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 leading-tight mb-2 hover:text-red-600 transition-colors">
-                      {news.title}
-                    </h3>
-                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                      {news.content}
-                    </p>
-                    <div className="flex items-center gap-4 text-gray-500">
-                      <button className="flex items-center gap-1.5 hover:text-red-600 transition-colors text-xs font-medium">
-                        <Share2 size={14} /> Compartilhar
-                      </button>
-                      <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors text-xs font-medium">
-                        <Bookmark size={14} /> Salvar
-                      </button>
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-xl overflow-hidden border border-gray-100">
+                      <img src={news.image} alt={news.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                     </div>
                   </div>
-                  <div className="w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0 rounded-xl overflow-hidden border border-gray-100">
-                    <img src={news.image} alt={news.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                  </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              ))
+            )}
           </div>
         </div>
       )}

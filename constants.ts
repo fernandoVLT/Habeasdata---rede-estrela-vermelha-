@@ -121,7 +121,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.LEADERSHIP,
     lat: -19.9675,
     lng: -44.1982,
-    address: 'Av. Amazonas, 123 - Centro'
+    address: 'Av. Amazonas, 123 - Centro',
+    region: 'Centro'
   },
   {
     id: 'm2',
@@ -130,7 +131,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.MST_COMMUNITY,
     lat: -19.9320,
     lng: -44.2450,
-    address: 'Zona Rural - Vianópolis'
+    address: 'Zona Rural - Vianópolis',
+    region: 'Vianópolis'
   },
   {
     id: 'm3',
@@ -139,7 +141,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.MEETING_POINT,
     lat: -19.9720,
     lng: -44.1920,
-    address: 'Rua da União, 45 - Brasileia'
+    address: 'Rua da União, 45 - Brasileia',
+    region: 'Brasileia'
   },
   {
     id: 'm4',
@@ -148,7 +151,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.DONATION,
     lat: -19.9550,
     lng: -44.2020,
-    address: 'Praça Milton Campos'
+    address: 'Praça Milton Campos',
+    region: 'Centro'
   },
   {
     id: 'm5',
@@ -157,7 +161,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.LEADERSHIP,
     lat: -19.9820,
     lng: -44.1850,
-    address: 'Bairro Angola'
+    address: 'Bairro Angola',
+    region: 'Angola'
   },
   {
     id: 'm6',
@@ -166,7 +171,8 @@ export const MAP_POINTS: MapPoint[] = [
     category: MapCategory.MST_COMMUNITY,
     lat: -19.9910,
     lng: -44.1550,
-    address: 'Jardim Teresópolis'
+    address: 'Jardim Teresópolis',
+    region: 'Teresópolis'
   },
   {
     id: 'm_event_now',
@@ -176,7 +182,8 @@ export const MAP_POINTS: MapPoint[] = [
     lat: -19.9240, 
     lng: -43.9400,
     address: 'Praça 7 - BH',
-    isLive: true // Flag for pulsing alert
+    isLive: true,
+    region: 'Belo Horizonte'
   }
 ];
 

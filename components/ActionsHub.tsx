@@ -13,6 +13,9 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
   // States for Modals
   const [showPetitionModal, setShowPetitionModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showDenunciaModal, setShowDenunciaModal] = useState(false);
+  const [showFakeNewsModal, setShowFakeNewsModal] = useState(false);
   
   // State for Petition/Poll Switcher
   const [creationType, setCreationType] = useState<'PETITION' | 'POLL'>('PETITION');
@@ -703,7 +706,7 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                <p className="text-sm text-gray-700 mb-4">
                  Combata a desinformação. Aqui você encontra checagens oficiais de notícias que circulam nos grupos.
                </p>
-               <button className="w-full bg-black text-white py-2.5 rounded-full font-bold text-sm">
+               <button onClick={() => setShowFakeNewsModal(true)} className="w-full bg-black text-white py-2.5 rounded-full font-bold text-sm">
                  Enviar Notícia Suspeita
                </button>
             </div>
@@ -947,11 +950,11 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                      Canais diretos de suporte para a militância e comunidade. Você não está sozinho.
                    </p>
                    <div className="grid grid-cols-2 gap-3">
-                      <button className="bg-white/10 hover:bg-white/20 border border-white/20 p-3 rounded-xl flex flex-col items-center gap-2 transition-colors">
+                      <button onClick={() => setShowSupportModal(true)} className="bg-white/10 hover:bg-white/20 border border-white/20 p-3 rounded-xl flex flex-col items-center gap-2 transition-colors">
                          <Scale className="text-white" size={24} />
                          <span className="text-xs font-bold">Suporte Jurídico</span>
                       </button>
-                      <button className="bg-white/10 hover:bg-white/20 border border-white/20 p-3 rounded-xl flex flex-col items-center gap-2 transition-colors">
+                      <button onClick={() => setShowDenunciaModal(true)} className="bg-white/10 hover:bg-white/20 border border-white/20 p-3 rounded-xl flex flex-col items-center gap-2 transition-colors">
                          <Phone className="text-white" size={24} />
                          <span className="text-xs font-bold">Denúncias</span>
                       </button>
@@ -1231,6 +1234,162 @@ export const ActionsHub: React.FC<ActionsHubProps> = ({ onNavigateToMap }) => {
                     </button>
                 </div>
               )}
+           </div>
+        </div>
+      )}
+
+      {/* SUPPORT MODAL */}
+      {showSupportModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowSupportModal(false)}>
+           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+              <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-900" onClick={() => setShowSupportModal(false)}>
+                <X size={24} />
+              </button>
+              
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-red-100 p-3 rounded-full text-red-600">
+                  <Scale size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Suporte Jurídico</h3>
+                  <p className="text-sm text-gray-500">Assistência para a militância</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Qual a sua necessidade?</label>
+                    <select className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none">
+                       <option>Orientação sobre manifestações</option>
+                       <option>Problemas com autoridades</option>
+                       <option>Dúvidas eleitorais</option>
+                       <option>Outros</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Descreva a situação</label>
+                    <textarea rows={4} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-600 focus:outline-none" placeholder="Detalhe o que aconteceu..."></textarea>
+                 </div>
+                 
+                 <button 
+                   className="w-full bg-red-600 text-white py-3 rounded-full font-bold hover:bg-red-700 transition-colors mt-2"
+                   onClick={() => {
+                     setShowSupportModal(false);
+                     showToast('Solicitação de suporte enviada com sucesso. Nossa equipe entrará em contato.');
+                   }}
+                 >
+                     Enviar Solicitação
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* DENUNCIA MODAL */}
+      {showDenunciaModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowDenunciaModal(false)}>
+           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+              <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-900" onClick={() => setShowDenunciaModal(false)}>
+                <X size={24} />
+              </button>
+              
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-orange-100 p-3 rounded-full text-orange-600">
+                  <Phone size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Canal de Denúncias</h3>
+                  <p className="text-sm text-gray-500">Relate irregularidades de forma segura</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Tipo de Denúncia</label>
+                    <select className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-600 focus:outline-none">
+                       <option>Crime Eleitoral</option>
+                       <option>Violência Política</option>
+                       <option>Abuso de Autoridade</option>
+                       <option>Outros</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Local do Ocorrido</label>
+                    <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-600 focus:outline-none" placeholder="Cidade, bairro, rua..." />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Relato</label>
+                    <textarea rows={4} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-orange-600 focus:outline-none" placeholder="Descreva os fatos com o máximo de detalhes..."></textarea>
+                 </div>
+                 
+                 <div className="flex items-center gap-2 mt-2">
+                    <input type="checkbox" id="anonimo" className="rounded text-orange-600 focus:ring-orange-600" />
+                    <label htmlFor="anonimo" className="text-sm text-gray-700">Desejo fazer a denúncia anonimamente</label>
+                 </div>
+                 
+                 <button 
+                   className="w-full bg-orange-600 text-white py-3 rounded-full font-bold hover:bg-orange-700 transition-colors mt-2"
+                   onClick={() => {
+                     setShowDenunciaModal(false);
+                     showToast('Denúncia registrada com sucesso. Um protocolo foi gerado.');
+                   }}
+                 >
+                     Registrar Denúncia
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* FAKE NEWS MODAL */}
+      {showFakeNewsModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowFakeNewsModal(false)}>
+           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+              <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-900" onClick={() => setShowFakeNewsModal(false)}>
+                <X size={24} />
+              </button>
+              
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-yellow-100 p-3 rounded-full text-yellow-600">
+                  <AlertTriangle size={28} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Reportar Notícia Falsa</h3>
+                  <p className="text-sm text-gray-500">Ajude a combater a desinformação</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Onde você viu isso?</label>
+                    <select className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-yellow-500 focus:outline-none">
+                       <option>WhatsApp</option>
+                       <option>Telegram</option>
+                       <option>Facebook</option>
+                       <option>Instagram</option>
+                       <option>Twitter / X</option>
+                       <option>Outro</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Link (se houver)</label>
+                    <input type="url" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-yellow-500 focus:outline-none" placeholder="https://..." />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Conteúdo da Mensagem</label>
+                    <textarea rows={4} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-yellow-500 focus:outline-none" placeholder="Cole o texto ou descreva o que diz a imagem/vídeo..."></textarea>
+                 </div>
+                 
+                 <button 
+                   className="w-full bg-black text-white py-3 rounded-full font-bold hover:bg-gray-800 transition-colors mt-2"
+                   onClick={() => {
+                     setShowFakeNewsModal(false);
+                     showToast('Notícia reportada! Nossa equipe de checagem irá analisar.');
+                   }}
+                 >
+                     Enviar para Checagem
+                 </button>
+              </div>
            </div>
         </div>
       )}

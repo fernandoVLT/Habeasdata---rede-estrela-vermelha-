@@ -77,6 +77,7 @@ const MapMarker = ({ point, isActive, onClick }: any) => {
 
 export const MapViz: React.FC<MapVizProps> = ({ focusLocation }) => {
   const [selectedCategory, setSelectedCategory] = useState<MapCategory | 'ALL'>('ALL');
+  const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
   const [activePoint, setActivePoint] = useState<MapPoint | null>(null);
   
   // Center of Betim, MG
@@ -97,11 +98,21 @@ export const MapViz: React.FC<MapVizProps> = ({ focusLocation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusLocation]);
 
-  const filteredPoints = useMemo(() => 
-    selectedCategory === 'ALL' 
-      ? MAP_POINTS 
-      : MAP_POINTS.filter(p => p.category === selectedCategory),
-  [selectedCategory]);
+  const uniqueRegions = useMemo(() => {
+    const regions = new Set(MAP_POINTS.map(p => p.region).filter(Boolean) as string[]);
+    return Array.from(regions).sort();
+  }, []);
+
+  const filteredPoints = useMemo(() => {
+    let points = MAP_POINTS;
+    if (selectedCategory !== 'ALL') {
+      points = points.filter(p => p.category === selectedCategory);
+    }
+    if (selectedRegion !== 'ALL') {
+      points = points.filter(p => p.region === selectedRegion);
+    }
+    return points;
+  }, [selectedCategory, selectedRegion]);
 
   // Provider function to use Google Maps Tiles
   const googleMapsProvider = (x: number, y: number, z: number, _dpr: number) => {
@@ -111,7 +122,19 @@ export const MapViz: React.FC<MapVizProps> = ({ focusLocation }) => {
   return (
     <div className="flex-1 flex flex-col h-screen border-r border-gray-200">
       <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Mapa da Militância - Betim/MG</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Mapa da Militância - Betim/MG</h2>
+          <select 
+            className="px-3 py-1.5 rounded-full text-sm font-medium border border-gray-300 bg-white text-gray-700 focus:outline-none focus:border-red-600"
+            value={selectedRegion}
+            onChange={(e) => setSelectedRegion(e.target.value)}
+          >
+            <option value="ALL">Todas as Regiões</option>
+            {uniqueRegions.map(region => (
+              <option key={region} value={region}>{region}</option>
+            ))}
+          </select>
+        </div>
         
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">

@@ -46,6 +46,7 @@ export interface MapPoint {
   category: MapCategory;
   address?: string;
   isLive?: boolean; 
+  region?: string;
 }
 
 export interface Trend {
