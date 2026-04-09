@@ -6,33 +6,22 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export const LandingPage = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
+    setErrorMessage(null);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Check if user exists in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // Create new user profile
-        await setDoc(userRef, {
-          uid: user.uid,
-          name: user.displayName || 'Usuário',
-          email: user.email || '',
-          avatar: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
-          role: 'user',
-          createdAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      await signInWithPopup(auth, provider);
+      // User creation in Firestore is now handled globally in App.tsx
+    } catch (error: any) {
       console.error("Error signing in with Google", error);
-      alert("Erro ao fazer login com o Google. Tente novamente.");
+      setErrorMessage(`Erro no login: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setIsLoggingIn(false);
     }
@@ -59,6 +48,15 @@ export const LandingPage = () => {
         <p className="text-xl text-gray-600 mb-10 max-w-2xl">
           Uma plataforma de engajamento social e mapeamento para fortalecer o PT e os movimentos sociais. Conecte-se, participe de ações e acompanhe seu impacto.
         </p>
+        
+        {errorMessage && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg max-w-2xl w-full text-left">
+            <p className="font-bold">Falha na Autenticação:</p>
+            <p className="text-sm font-mono mt-1">{errorMessage}</p>
+            <p className="text-sm mt-2">Se o erro for "unauthorized domain", o domínio atual precisa ser adicionado no Firebase Console (Authentication &gt; Settings &gt; Authorized domains).</p>
+          </div>
+        )}
+
         <button onClick={handleLogin} disabled={isLoggingIn} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
           {isLoggingIn ? 'Autenticando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
         </button>

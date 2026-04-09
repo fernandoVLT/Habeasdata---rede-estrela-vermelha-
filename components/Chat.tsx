@@ -59,33 +59,32 @@ export const Chat = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Fetch users for new chat
-    const fetchUsers = async () => {
-      try {
-        const q = query(collection(db, 'users'));
-        const snapshot = await getDocs(q);
-        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(u => u.id !== currentUser.uid);
-        setUsers(usersData);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'users');
-      }
-    };
-    fetchUsers();
+    // Fetch users for new chat in real-time
+    const qUsers = query(collection(db, 'users'));
+    const unsubscribeUsers = onSnapshot(qUsers, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(u => u.id !== currentUser.uid);
+      setUsers(usersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    });
 
     // Listen to user's chats
-    const q = query(
+    const qChats = query(
       collection(db, 'chats'),
       where('participants', 'array-contains', currentUser.uid)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeChats = onSnapshot(qChats, (snapshot) => {
       const chatsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setChats(chatsData);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'chats');
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeUsers();
+      unsubscribeChats();
+    };
   }, [currentUser]);
 
   useEffect(() => {

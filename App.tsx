@@ -10,8 +10,9 @@ import { EstrelinhaAI } from './components/EstrelinhaAI';
 import { Dashboard } from './components/Dashboard';
 import { Chat } from './components/Chat';
 import { CURRENT_USER, NOTIFICATIONS, LEADERS_LIST } from './constants';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 enum View {
   HOME = 'HOME',
@@ -75,8 +76,27 @@ const App: React.FC = () => {
   const hasNewActions = true; 
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
+        try {
+          // Ensure user exists in Firestore
+          const userRef = doc(db, 'users', currentUser.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              name: currentUser.displayName || 'Usuário',
+              email: currentUser.email || '',
+              avatar: currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}`,
+              role: 'user',
+              createdAt: serverTimestamp()
+            });
+          }
+        } catch (error) {
+          console.error("Error ensuring user profile exists:", error);
+        }
+
         setIsAuthenticated(true);
         setUser(currentUser);
       } else {
