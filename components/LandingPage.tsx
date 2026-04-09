@@ -1,31 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Star, Users, Map as MapIcon, Megaphone } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 export const LandingPage = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check for redirect result when the component mounts
-    const checkRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          // User successfully logged in via redirect
-          // The App.tsx onAuthStateChanged will handle the rest
-        }
-      } catch (error: any) {
-        console.error("Error with redirect login", error);
-        setErrorMessage(`Erro no login: ${error.message || 'Erro desconhecido'}`);
-        setIsLoggingIn(false);
-      }
-    };
-    
-    checkRedirectResult();
-  }, []);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -36,8 +16,8 @@ export const LandingPage = () => {
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      // Use redirect instead of popup to avoid iframe/domain issues
-      await signInWithRedirect(auth, provider);
+      // Using popup as it is more reliable in embedded/custom domain environments
+      await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error("Error initiating Google sign in", error);
       setErrorMessage(`Erro ao iniciar login: ${error.message || 'Erro desconhecido'}`);
@@ -71,12 +51,18 @@ export const LandingPage = () => {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg max-w-2xl w-full text-left">
             <p className="font-bold">Falha na Autenticação:</p>
             <p className="text-sm font-mono mt-1">{errorMessage}</p>
-            <p className="text-sm mt-2">Se o erro persistir, verifique se o domínio está autorizado no Firebase Console.</p>
+            <p className="text-sm mt-2">O Firebase bloqueou o login porque este domínio não está autorizado.</p>
+            <p className="text-sm mt-1 font-bold">Para corrigir:</p>
+            <ol className="list-decimal ml-5 text-sm mt-1">
+              <li>Acesse o painel do Firebase</li>
+              <li>Vá em Authentication &gt; Settings &gt; Authorized domains</li>
+              <li>Adicione EXATAMENTE: <strong>redesocial-ptbetim.habeasdata.com.br</strong> (sem https://)</li>
+            </ol>
           </div>
         )}
 
         <button onClick={handleLogin} disabled={isLoggingIn} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
-          {isLoggingIn ? 'Redirecionando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
+          {isLoggingIn ? 'Autenticando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
         </button>
 
         {/* Features */}
