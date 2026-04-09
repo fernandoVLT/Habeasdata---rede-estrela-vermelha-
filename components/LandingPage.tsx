@@ -1,12 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Users, Map as MapIcon, Megaphone } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export const LandingPage = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for redirect result when the component mounts
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // User successfully logged in via redirect
+          // The App.tsx onAuthStateChanged will handle the rest
+        }
+      } catch (error: any) {
+        console.error("Error with redirect login", error);
+        setErrorMessage(`Erro no login: ${error.message || 'Erro desconhecido'}`);
+        setIsLoggingIn(false);
+      }
+    };
+    
+    checkRedirectResult();
+  }, []);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -17,12 +36,11 @@ export const LandingPage = () => {
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      await signInWithPopup(auth, provider);
-      // User creation in Firestore is now handled globally in App.tsx
+      // Use redirect instead of popup to avoid iframe/domain issues
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
-      console.error("Error signing in with Google", error);
-      setErrorMessage(`Erro no login: ${error.message || 'Erro desconhecido'}`);
-    } finally {
+      console.error("Error initiating Google sign in", error);
+      setErrorMessage(`Erro ao iniciar login: ${error.message || 'Erro desconhecido'}`);
       setIsLoggingIn(false);
     }
   };
@@ -53,12 +71,12 @@ export const LandingPage = () => {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg max-w-2xl w-full text-left">
             <p className="font-bold">Falha na Autenticação:</p>
             <p className="text-sm font-mono mt-1">{errorMessage}</p>
-            <p className="text-sm mt-2">Se o erro for "unauthorized domain", o domínio atual precisa ser adicionado no Firebase Console (Authentication &gt; Settings &gt; Authorized domains).</p>
+            <p className="text-sm mt-2">Se o erro persistir, verifique se o domínio está autorizado no Firebase Console.</p>
           </div>
         )}
 
         <button onClick={handleLogin} disabled={isLoggingIn} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
-          {isLoggingIn ? 'Autenticando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
+          {isLoggingIn ? 'Redirecionando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
         </button>
 
         {/* Features */}
