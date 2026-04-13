@@ -1,11 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, Users, Map as MapIcon, Megaphone } from 'lucide-react';
 import { auth } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 
 export const LandingPage = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Verifica se o usuário acabou de voltar do redirecionamento do Google
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // Login com sucesso! O App.tsx vai detectar a mudança de estado.
+        }
+      } catch (error: any) {
+        console.error("Erro ao processar o redirecionamento:", error);
+        setErrorMessage(`Erro no login: ${error.message || 'Erro desconhecido'}`);
+        setIsLoggingIn(false);
+      }
+    };
+    
+    checkRedirectResult();
+  }, []);
 
   const handleLogin = async () => {
     if (isLoggingIn) return;
@@ -16,8 +34,8 @@ export const LandingPage = () => {
       provider.setCustomParameters({
         prompt: 'select_account'
       });
-      // Using popup as it is more reliable in embedded/custom domain environments
-      await signInWithPopup(auth, provider);
+      // Usando redirecionamento em vez de popup para evitar bloqueios de navegadores/mobile
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
       console.error("Error initiating Google sign in", error);
       setErrorMessage(`Erro ao iniciar login: ${error.message || 'Erro desconhecido'}`);
@@ -34,7 +52,7 @@ export const LandingPage = () => {
           <span className="text-xl font-bold tracking-tight">Rede Estrela MG</span>
         </div>
         <button onClick={handleLogin} disabled={isLoggingIn} className="px-5 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-700 transition-colors disabled:opacity-50">
-          {isLoggingIn ? 'Entrando...' : 'Entrar'}
+          {isLoggingIn ? 'Redirecionando...' : 'Entrar'}
         </button>
       </header>
       
@@ -62,7 +80,7 @@ export const LandingPage = () => {
         )}
 
         <button onClick={handleLogin} disabled={isLoggingIn} className="px-8 py-4 bg-red-600 text-white text-lg font-bold rounded-full hover:bg-red-700 transition-transform hover:scale-105 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100">
-          {isLoggingIn ? 'Autenticando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
+          {isLoggingIn ? 'Redirecionando...' : 'Fazer parte da Rede'} <Star size={20} className="fill-current" />
         </button>
 
         {/* Features */}
